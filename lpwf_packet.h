@@ -1,6 +1,7 @@
 #ifndef LPWF_PACKET
 #define LPWF_PACKET
 #include "lpwf_buff.h"
+#include "stdbool.h"
 
 typedef int data_t;
 typedef int crc_t;
@@ -17,6 +18,7 @@ typedef struct packet_tag{
 #pragma pack()
 
 void lp_build(packet_t *pkt, data_t data);
-void lp_to_buff(packet_t *data, lb_chunk *dest, size_t buff_size);
+void lp_to_buff(packet_t *pkt, lb_chunk *dest, size_t buff_size);
+bool lp_from_buff(packet_t *pkt, lb_chunk *buff, size_t buff_size);
 
 #endif

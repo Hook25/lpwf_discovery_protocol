@@ -1,19 +1,25 @@
 #include "lpwf_packet.h"
 #include "lpwf_buff.h"
 #include<stdio.h>
+#include<stdbool.h>
+#define expect(x) do{if(!(x)){return false;}}while(0)
+
+bool test_valid_packet(){
+  packet_t pkt;
+  lp_build(&pkt, 130);
+  lb_chunk buff[sizeof pkt];
+  lp_to_buff(&pkt, buff, sizeof pkt);
+  expect(lp_from_buff(&pkt, buff, sizeof buff));
+  buff[0] = !buff[0];
+  expect(!lp_from_buff(&pkt, buff, sizeof buff));
+  return true;
+}
+
 
 int main(void){
-  lb_chunk k [] = {42,42,191};
-  lb_chunk result = lb_get_value(k+1, 2);
-  printf("%ud\n", result);
-  int whr = lb_search(170, k, 3);
-  printf("Found at: %d\n", whr);
-  packet_t test;
-  lp_build(&test, 120);
-
-  lb_chunk buff[sizeof test];
-  lp_to_buff(&test, buff, sizeof buff);
-  printf("Packet of size %d\n  id: %ud\n  data: %d\n  crc: %d\n", sizeof buff, buff[0], buff[1], buff[2]);
+  if(!test_valid_packet()){
+    printf("Test valid packet failed\n");
+  }
 
   return 0;
 }
