@@ -5,7 +5,7 @@ DEFINES=PROJECT_CONF_H=\"project-conf.h\"
 CONTIKI_PROJECT = app
 
 PROJECT_SOURCEFILES += nd.c
-PROJECT_SOURCEFILES += nd-rdc.c netstack.c nd-netstack.c
+PROJECT_SOURCEFILES += nd-rdc.c netstack.c nd-netstack.c lpwf_packet.c
 
 all: $(CONTIKI_PROJECT)
 

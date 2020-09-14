@@ -41,7 +41,8 @@ obj_sky/nd.o: nd.c /home/h25/prj/contiki/core/./contiki.h \
  /home/h25/prj/contiki/core/./net/mac/framer.h \
  /home/h25/prj/contiki/core/./net/packetbuf.h \
  /home/h25/prj/contiki/core/./net/mac/tsch/tsch-conf.h \
- /home/h25/prj/contiki/core/sys/node-id.h nd.h
+ /home/h25/prj/contiki/core/sys/node-id.h \
+ /home/h25/prj/contiki/core/lib/assert.h nd.h lpwf_packet.h
 nd.c /home/h25/prj/contiki/core/./contiki.h :
  /home/h25/prj/contiki/core/./contiki-version.h :
  /home/h25/prj/contiki/platform/sky/./contiki-conf.h :
@@ -85,4 +86,5 @@ nd.c /home/h25/prj/contiki/core/./contiki.h :
  /home/h25/prj/contiki/core/./net/mac/framer.h :
  /home/h25/prj/contiki/core/./net/packetbuf.h :
  /home/h25/prj/contiki/core/./net/mac/tsch/tsch-conf.h :
- /home/h25/prj/contiki/core/sys/node-id.h nd.h :
+ /home/h25/prj/contiki/core/sys/node-id.h :
+ /home/h25/prj/contiki/core/lib/assert.h nd.h lpwf_packet.h :

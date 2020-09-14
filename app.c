@@ -1,5 +1,6 @@
 #include "contiki.h"
 #include "node-id.h"
+#include "core/sys/rtimer.h"
 #include "dev/radio.h"
 #include "lib/random.h"
 #include "net/netstack.h"
@@ -7,18 +8,9 @@
 /*---------------------------------------------------------------------------*/
 #include "nd.h"
 /*---------------------------------------------------------------------------*/
-#define ACTION_RANGE 4
-
-#ifdef TX_BURST
-#define BURST tx_burst
-#define SPARSE rx_sparse
-#else
-#define BURST rx_burst
-#define SPARSE tx_sparse
+#ifndef LPWF_BURST
+#define LPWF_BURST 1
 #endif
-
-typedef char action_t;
-
 static void
 nd_new_nbr_cb(uint16_t epoch, uint8_t nbr_id)
 {
@@ -37,21 +29,6 @@ struct nd_callbacks rcb = {
   .nd_new_nbr = nd_new_nbr_cb,
   .nd_epoch_end = nd_epoch_end_cb};
 /*---------------------------------------------------------------------------*/
-#if TX_BURST
-int rx_sparse(void){
-  return 0;
-}
-int tx_burst(void){
-  return 0;
-}
-#else
-int tx_sparse(void){
-  return 0;
-}
-int rx_burst(void){
-  return 0;
-}
-#endif
 
 PROCESS(app_process, "Application process");
 AUTOSTART_PROCESSES(&app_process);
@@ -59,10 +36,10 @@ AUTOSTART_PROCESSES(&app_process);
 PROCESS_THREAD(app_process, ev, data)
 {
   static struct etimer et;
-  static action_t _sparse;
+  static struct rtimer rt;
 
   PROCESS_BEGIN();
-
+  rtimer_init();
   /* Initialization */
   printf("Node ID: %u\n", node_id);
   printf("RTIMER_SECOND: %u\n", RTIMER_SECOND);
@@ -76,27 +53,14 @@ PROCESS_THREAD(app_process, ev, data)
   /* Wait at the beginning a random time to de-synchronize node start */
   etimer_set(&et, random_rand() % CLOCK_SECOND);
   PROCESS_WAIT_UNTIL(etimer_expired(&et));
-
   /* Start ND Primitive */
-  //nd_start(ND_BURST, &rcb);
-  /* nd_start(ND_SCATTER, &rcb); */
-
+  #if LPWF_BURST
+  nd_start(ND_BURST, &rcb);
+  #else
+  nd_start(ND_SCATTER, &rcb); */
+  #endif
   /* Do nothing else */
-  while (1) {
     //PROCESS_WAIT_EVENT();
-    _sparse = (_sparse + 1) % ACTION_RANGE;
-    int err = 0;
-    if(_sparse){
-      err = SPARSE();
-    }else{
-      printf("Epoch\n");
-      err = BURST();
-    }
-    if(err){
-      printf("Failed on action %d, err: %d\n", _sparse, err);
-    }
-  }
-
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/

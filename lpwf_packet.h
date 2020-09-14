@@ -1,24 +1,18 @@
 #ifndef LPWF_PACKET
 #define LPWF_PACKET
-#include "lpwf_buff.h"
-#include "stdbool.h"
 
-typedef int data_t;
-typedef int crc_t;
-typedef unsigned char id_t;
+#include<stdbool.h>
+#include<stddef.h>
 
-#pragma pack(1)
+typedef char lpwf_id;
+typedef char lpwf_check;
 
-typedef struct packet_tag{
-  id_t id;
-  data_t data;
-  crc_t crc;
-} packet_t;
+typedef struct {
+  lpwf_id id;
+  lpwf_check check;
+} lpwf_packet;
 
-#pragma pack()
-
-void lp_build(packet_t *pkt, data_t data);
-void lp_to_buff(packet_t *pkt, lb_chunk *dest, size_t buff_size);
-bool lp_from_buff(packet_t *pkt, lb_chunk *buff, size_t buff_size);
+bool lpwf_get_id(void *data, size_t data_l, lpwf_id *id);
+void lpwf_build_from_id(lpwf_packet *p, lpwf_id *id);
 
 #endif

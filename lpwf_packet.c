@@ -1,31 +1,40 @@
 #include "lpwf_packet.h"
-#include "lpwf_packet_private.h"
-#include "assert.h"
-#include "string.h"
+#include<stdbool.h>
+#include<assert.h>
+#include<stddef.h>
+#include<stdio.h>
+#include<string.h>
 
-#define PKT_BLK_ID 170 //10101010
-
-crc_t lp_crc(packet_t *pkt){
-  return pkt->id ^ pkt->data;
+bool lpwf_valid(lpwf_packet *p){
+  return p;
 }
 
-bool lp_valid_packet(packet_t *pkt){
-  return lp_crc(pkt) == pkt->crc;
+void lpwf_build_from_data(lpwf_packet *p, void *data, size_t data_l){
+  assert(p && data && data_l < sizeof (*p));
+  memcpy(p, data, data_l); 
 }
 
-void lp_to_buff(packet_t *pkt, lb_chunk *dest, size_t buff_size){
-  assert(sizeof *pkt <= buff_size);
-  memcpy(dest, pkt, sizeof *pkt);
+void lpwf_calc_check(lpwf_packet *p){
+  
 }
 
-void lp_build(packet_t *pkt, data_t data){
-  pkt->data = data;
-  pkt->id = PKT_BLK_ID;
-  pkt->crc = lp_crc(pkt);
+void lpwf_build_from_id(lpwf_packet *p, lpwf_id *id){
+  memcpy(&p->id, id, sizeof *id);
+  lpwf_calc_check(p);
 }
 
-bool lp_from_buff(packet_t *pkt, lb_chunk *buff, size_t buff_size){
-  assert(buff_size <= sizeof *pkt);
-  memcpy(pkt, buff, buff_size);
-  return lp_valid_packet(pkt);
+void lpwf_dbg_print(lpwf_packet *p){
+  printf("{\n  id = %d;\n  check = %d;\n}\n", p->id, p->check);
 }
+
+bool lpwf_get_id(void *data, size_t data_l, lpwf_id *id){
+  lpwf_packet tmp;
+  lpwf_build_from_data(&tmp, data, data_l);
+  if(lpwf_valid(&tmp)){
+    memcpy(id, &tmp.id, sizeof tmp.id);
+    return true;
+  }
+  return false;
+}
+
+
