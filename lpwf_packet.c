@@ -5,8 +5,10 @@
 #include<stdio.h>
 #include<string.h>
 
+#define MAGIC 42
+
 bool lpwf_valid(lpwf_packet *p){
-  return p;
+  return p && ((p->id ^ MAGIC) == p->check);
 }
 
 void lpwf_build_from_data(lpwf_packet *p, void *data, size_t data_l){
@@ -15,7 +17,7 @@ void lpwf_build_from_data(lpwf_packet *p, void *data, size_t data_l){
 }
 
 void lpwf_calc_check(lpwf_packet *p){
-  
+  p->check = (p->id ^ MAGIC);
 }
 
 void lpwf_build_from_id(lpwf_packet *p, lpwf_id *id){

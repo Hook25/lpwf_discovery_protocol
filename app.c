@@ -33,7 +33,6 @@ AUTOSTART_PROCESSES(&app_process);
 PROCESS_THREAD(app_process, ev, data)
 {
   static struct etimer et;
-  static struct rtimer rt;
 
   PROCESS_BEGIN();
   rtimer_init();
@@ -53,7 +52,7 @@ PROCESS_THREAD(app_process, ev, data)
   /* Start ND Primitive */
   nd_start(ND_BURST, &rcb);
   /* Do nothing else */
-    //PROCESS_WAIT_EVENT();
+  PROCESS_WAIT_EVENT();
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/

@@ -24,25 +24,57 @@
 #define PRINTF(...)
 #endif
 
-#define T_WINDOW_L (30 * (CLOCK_SECOND / 100))
-#define T_SPACING (1 * (CLOCK_SECOND / 100))
+#define T_WINDOW_L (30 * (RTIMER_SECOND / 100))
+#define T_SPACING (1 * (RTIMER_SECOND / 100))
 #define T_BEACON_COUNT (T_WINDOW_L / T_SPACING)
 #define R_WINDOW_L (2*T_WINDOW_L)
-#define R_WINDOW_D = (R_WINDOW_L / 2)
-#define EPOCH_DURATION_N 2
+#define R_WINDOW_D (R_WINDOW_L / 5)
+#define EPOCH_DURATION_N 6
 
-static struct nd_callbacks app_cb = {
-  .nd_new_nbr = NULL,
-  .nd_epoch_end = NULL
-}; //consider moving this
+PROCESS(nd_process, "ND algorithm process");
+
+typedef struct {
+  struct nd_callbacks app_cb;
+  int beacon_count;
+  int mode;
+  int phase;
+  int phase_count;
+  int discovered;
+  int discovered_ids[MAX_NBR];
+  int epoch;
+} env_t;
+
+void dbg_print_env_t(const env_t *e){
+  PRINTF("{beacon_count : %d,mode : %d,phase : %d,"
+         "phase_count : %d,discovered : %d,epoch : %d}\n",
+         e->beacon_count, e->mode, e->phase, e->phase_count,
+         e->discovered, e->epoch);
+}
+
+static env_t e;
+
+bool ins_disc(int id){
+  int i;
+  for(i = 0; i < e.discovered; i++){
+    if(e.discovered_ids[i] == id){
+      return false;
+    }
+  }
+  assert(e.discovered < MAX_NBR);
+  e.discovered_ids[e.discovered] = id;
+  e.discovered++;
+  return true;
+}
 
 void nd_recv(void) {
   int len = packetbuf_datalen();
   void *data = packetbuf_dataptr();
   lpwf_id id;
   if(lpwf_get_id(data, len, &id)){
-    assert(app_cb.nd_new_nbr);
-    app_cb.nd_new_nbr(0, id);
+    assert(e.app_cb.nd_new_nbr);
+    if(ins_disc(id)){
+      e.app_cb.nd_new_nbr(e.epoch, id);
+    }
   }else{
     printf("received corrupted packet\n");
   }
@@ -58,89 +90,125 @@ static void beacon(void){
   NETSTACK_RADIO.send(packetbuf_dataptr(), packetbuf_datalen());
 }
 
-static int send_p(int mode, int *phase){
-  static int beacon_count = -1;
-  //static rtimer burst_timer; //TODO: work with this after
-  if(beacon_count == -1){
-    beacon_count = T_BEACON_COUNT + 1;
-  }else if(beacon_count == 0){
-    beacon_count = T_BEACON_COUNT;
-    (*phase)++;
+static void reset_t_beacon_count(void){
+  if(e.mode == ND_BURST){
+    e.beacon_count = T_BEACON_COUNT;
+  }else{
+    e.beacon_count = 1;
+  }
+}
+
+static int send_phase(void){
+  if(e.beacon_count == 0){
+    //send_phase is over
+    reset_t_beacon_count();
+    if(e.mode == ND_BURST){
+      e.phase++;
+    }
+    e.phase_count++;
     return 0;
   }
-  beacon_count--;
+  e.beacon_count--;
   beacon();
-  if(mode == ND_BURST){
+  if(e.mode == ND_BURST){
     return T_SPACING;
   }
   //else mode is ND_SCATTER
   return T_WINDOW_L;
 }
 
-static int recv_p(int mode, int *phase){
-  static uint8_t on;  //leads to bug on non even cycles, fix
-  (*phase)++;
-  if(on){
-    NETSTACK_RADIO.off();
-  }else{
-    NETSTACK_RADIO.on();
-  }
-  on = !on;
-  if(mode == ND_BURST){
-    if(on){
-      return R_WINDOW_D;
-    }
-    return R_WINDOW_L - R_WINDOW_D;
+static int recv_start(void){
+  NETSTACK_RADIO.on();
+  e.phase++;
+  if(e.mode == ND_BURST){
+    return R_WINDOW_D;
   } 
   //else mode is ND_SCATTER
   return R_WINDOW_L;
 }
 
-static void init_p_arr(const uint8_t mode, int (*phase[])(int, int*)){
+static int recv_end(void){
+  NETSTACK_RADIO.off();
+  e.phase_count++;
+  if(e.mode == ND_BURST){
+    e.phase --;
+    return (R_WINDOW_L - R_WINDOW_D);
+  }
+  e.phase++;
+  return 0;
+}
+
+static void init_p_arr(const uint8_t mode, int (*phase[])(void)){
   if(mode == ND_BURST){
-    phase[0] = send_p;
-    phase[1] = recv_p;
+    phase[0] = send_phase;
+    phase[1] = recv_start;
+    phase[2] = recv_end;
   }else{
-    phase[0] = recv_p;
-    phase[1] = send_p;
+    phase[0] = recv_start;
+    phase[1] = recv_end;
+    phase[2] = send_phase;
   } 
 }
 
-static void epoch_end(uint8_t *epoch, uint8_t *phase_i){
-  NETSTACK_RADIO.off();
-  app_cb.nd_epoch_end(*epoch, 0);
-  (*epoch) ++;
-  (*phase_i) = 0; 
+static void reset_nbr_ids(void){
+  memset(&e.discovered_ids, 0, sizeof(e.discovered_ids));
+}
+
+static void epoch_end(void){
+  e.app_cb.nd_epoch_end(e.epoch, e.discovered);
+  e.epoch ++;
+  e.discovered = 0;
+  e.phase_count = 0;
+  e.phase = 0;
+  reset_t_beacon_count();
+  reset_nbr_ids();
+}
+
+static void poke(struct rtimer *t, void *unused){
+  printf("NEXT POKE\n");
+  if(process_post(&nd_process, 200, 0)){
+    printf("PROCESS_ERR_FULL\n");
+  }
 }
 
 /*---------------------------------------------------------------------------*/
-PROCESS(nd_process, "ND algorithm process");
 PROCESS_THREAD(nd_process, ev, data)
 {
-  static struct etimer backoff_timer;
-  static uint8_t epoch, mode;
-  static int phase_i;
-  static int (*phase[2])(int, int*);
+  static struct rtimer backoff_timer;
+  static int (*phases[3])(void);
   PROCESS_BEGIN();
-  mode = *((uint8_t *)data);
-  init_p_arr(mode, phase);
+  e.mode = *((uint8_t *)data);
+  init_p_arr(e.mode, phases);
+  reset_t_beacon_count();
+  reset_nbr_ids();
   for(;;){
-    if(phase_i == EPOCH_DURATION_N){ //epoch is done
-      epoch_end(&epoch, &phase_i);
-      //cancel backoff timer?
+    dbg_print_env_t(&e);
+    if(e.phase_count == EPOCH_DURATION_N){ //epoch is done
+      epoch_end();
     }
-    int backoff = phase[phase_i == 0 ? 0 : 1](mode, &phase_i);
-    etimer_set(&backoff_timer, backoff);
-    PROCESS_WAIT_UNTIL(etimer_expired(&backoff_timer));
+    assert(e.phase < 3);
+    rtimer_clock_t backoff = phases[e.phase]();
+    if(backoff > 0){
+      printf("NEXT : %u\n", RTIMER_NOW() + backoff);
+      assert(
+        !rtimer_set(&backoff_timer, RTIMER_NOW() + backoff, 0, poke, 0)
+      );
+      PROCESS_WAIT_EVENT();
+      while(ev != 200){ printf("not 200\n"); PROCESS_WAIT_EVENT(); }
+      printf("EVENT WAITED\n");
+    }
   }
   PROCESS_END();
 }
 
 void nd_start(uint8_t mode, const struct nd_callbacks *cb) {
-  app_cb.nd_new_nbr = cb->nd_new_nbr;
-  app_cb.nd_epoch_end = cb->nd_epoch_end;
+  e.app_cb.nd_new_nbr = cb->nd_new_nbr;
+  e.app_cb.nd_epoch_end = cb->nd_epoch_end;
   /* wont support threads */
+  assert(EPOCH_DURATION_N > 0 && R_WINDOW_L > 0 && R_WINDOW_D > 0
+      && T_WINDOW_L > 0 && T_SPACING > 0);
   assert(mode == ND_BURST || mode == ND_SCATTER);
   process_start(&nd_process, &mode);
+  printf("start done\n");
 }
 /*---------------------------------------------------------------------------*/
