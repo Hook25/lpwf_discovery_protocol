@@ -10,7 +10,7 @@ bool lpwf_valid(lpwf_packet *p){
 }
 
 void lpwf_build_from_data(lpwf_packet *p, void *data, size_t data_l){
-  assert(p && data && data_l < sizeof (*p));
+  assert(p && data && data_l <= sizeof (*p));
   memcpy(p, data, data_l); 
 }
 

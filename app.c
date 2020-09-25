@@ -8,9 +8,6 @@
 /*---------------------------------------------------------------------------*/
 #include "nd.h"
 /*---------------------------------------------------------------------------*/
-#ifndef LPWF_BURST
-#define LPWF_BURST 1
-#endif
 static void
 nd_new_nbr_cb(uint16_t epoch, uint8_t nbr_id)
 {
@@ -54,11 +51,7 @@ PROCESS_THREAD(app_process, ev, data)
   etimer_set(&et, random_rand() % CLOCK_SECOND);
   PROCESS_WAIT_UNTIL(etimer_expired(&et));
   /* Start ND Primitive */
-  #if LPWF_BURST
   nd_start(ND_BURST, &rcb);
-  #else
-  nd_start(ND_SCATTER, &rcb); */
-  #endif
   /* Do nothing else */
     //PROCESS_WAIT_EVENT();
   PROCESS_END();

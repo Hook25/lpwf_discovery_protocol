@@ -4,7 +4,7 @@
 #include<stdbool.h>
 #include<stddef.h>
 
-typedef char lpwf_id;
+typedef short unsigned int lpwf_id;
 typedef char lpwf_check;
 
 typedef struct {
