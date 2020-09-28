@@ -15,12 +15,12 @@
 #include "etimer.h"
 /*---------------------------------------------------------------------------*/
 #ifndef DEBUG
-#define DEBUG 1
+#define DEBUG 0
 #define VERBOSE 0
+#define STDOUT_ASSERT 1
 #endif
 
-//#define dbg_pc(x) printf(#x ": %d\n", x);
-#define dbg_pc(x) 
+#define dbg_pc(x) printf(#x ": %d\n", x);
 
 #define T_WINDOW_L (30 * (RTIMER_SECOND / 100))
 #define T_SPACING (1 * (RTIMER_SECOND / 100))
@@ -54,13 +54,17 @@ typedef struct {
   #else
   void dbg_print_env_t(const env_t *e){}
   #endif
-  #define assert(x) if(!(x)){printf("[%s:%d]: " #x "\n", __FILE__, __LINE__);}
-    // ^ might crash the board if called in preemptive context
 #else
   #define PRINTF(...)
-  #include <assert.h> //not supported on all boards, still
   void dbg_print_env_t(const env_t *e){}
 #endif
+#if STDOUT_ASSERT
+  #define assert(x) if(!(x)){printf("[%s:%d]: " #x "\n", __FILE__, __LINE__);}
+#else
+  #include <assert.h> //not supported on all boards, still
+#endif
+#define POKE_ID 200
+#define RECV_PENDING_ID 201
 
 static env_t e;
 
@@ -77,7 +81,7 @@ bool ins_disc(int id){
   return true;
 }
 
-void nd_recv(void) {
+void act_recv(void) {
   int len = packetbuf_datalen();
   void *data = packetbuf_dataptr();
   lpwf_id id;
@@ -88,6 +92,12 @@ void nd_recv(void) {
     }
   }else{
     PRINTF("received corrupted packet\n");
+  }
+}
+
+void nd_recv(void){
+  if(process_post(&nd_process, RECV_PENDING_ID, 0)){
+    PRINTF("PROCESS_ERR_FULL\n"); 
   }
 }
 
@@ -177,7 +187,7 @@ static void epoch_end(void){
 
 static void poke(struct rtimer *t, void *unused){
   PRINTF("NEXT POKE\n");
-  if(process_post(&nd_process, 200, 0)){
+  if(process_post(&nd_process, POKE_ID, 0)){
     PRINTF("PROCESS_ERR_FULL\n"); 
   }
 }
@@ -205,7 +215,12 @@ PROCESS_THREAD(nd_process, ev, data)
         !rtimer_set(&backoff_timer, RTIMER_NOW() + backoff, 0, poke, 0)
       );
       PROCESS_WAIT_EVENT();
-      while(ev != 200){ PRINTF("not 200\n"); PROCESS_WAIT_EVENT(); }
+      while(ev != POKE_ID){ //recv_pending or other
+        if(ev == RECV_PENDING_ID){
+          act_recv();
+        }
+        PROCESS_WAIT_EVENT(); 
+      }
       PRINTF("EVENT WAITED\n");
     }
   }
