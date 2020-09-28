@@ -20,14 +20,13 @@
 #define STDOUT_ASSERT 1
 #endif
 
-#define dbg_pc(x) printf(#x ": %d\n", x);
+#include "lpwf_params.h"
 
-#define T_WINDOW_L (30 * (RTIMER_SECOND / 100))
-#define T_SPACING (1 * (RTIMER_SECOND / 100))
+#define T_WINDOW_L (LPWF_T_W_MS * (RTIMER_SECOND / 1000))
+#define T_SPACING (LPWF_T_S_MS * (RTIMER_SECOND / 1000))
 #define T_BEACON_COUNT (T_WINDOW_L / T_SPACING)
-#define R_WINDOW_L (2*T_WINDOW_L)
+#define R_WINDOW_L (LPWF_R_W_PROP*T_WINDOW_L)
 #define R_WINDOW_D (R_WINDOW_L / 5)
-#define EPOCH_DURATION_N 6
 
 PROCESS(nd_process, "ND algorithm process");
 
@@ -44,6 +43,7 @@ typedef struct {
 
 #if DEBUG
   #define PRINTF(...) printf(__VA_ARGS__)
+  #define dbg_pc(x) printf(#x ": %d\n", x);
   #if VERBOSE
   void dbg_print_env_t(const env_t *e){
     PRINTF("{beacon_count : %d,mode : %d,phase : %d,"
@@ -55,10 +55,12 @@ typedef struct {
   void dbg_print_env_t(const env_t *e){}
   #endif
 #else
+  #define dbg_pc(x) 
   #define PRINTF(...)
   void dbg_print_env_t(const env_t *e){}
 #endif
 #if STDOUT_ASSERT
+  #warning assert is not asserting but printing fails!
   #define assert(x) if(!(x)){printf("[%s:%d]: " #x "\n", __FILE__, __LINE__);}
 #else
   #include <assert.h> //not supported on all boards, still

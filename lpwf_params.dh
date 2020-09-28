@@ -1,0 +1,14 @@
+#ifndef LPWF_PARAMS
+#define LPWF_PARAMS
+
+#define LPWF_T_W_MS {lpwf_t_w_ms}
+#define LPWF_T_S_MS {lpwf_t_s_ms}
+#define LPWF_R_W_PROP {lpwf_r_w_prop}
+
+/* An epoch is composed of 1 phase1 + N-1 phase2
+    for example for ND_BURST and N = 4
+      mote ex: | burst | | recv / sleep | | recv / sleep | | recv / sleep |
+*/
+#define EPOCH_DURATION_N {lpwf_epoch_n}
+
+#endif

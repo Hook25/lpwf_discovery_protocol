@@ -663,7 +663,7 @@
     org.contikios.cooja.plugins.ScriptRunner
     <plugin_config>
       <script>SIM_SETTLING_TIME = 1000
-        TIMEOUT(180000);
+        TIMEOUT(18000);
         try {
           load("nashorn:mozilla_compat.js");
         } catch(err) {}
@@ -679,8 +679,8 @@
         ptplugin = sim.getCooja().getStartedPlugin("PowerTracker");
         ptplugin.reset();
 
-        outputs = new FileWriter("test.log");
-        dcoutputs = new FileWriter("test_dc.log");
+        outputs = new FileWriter("OUTPATH/test_30.log");
+        dcoutputs = new FileWriter("OUTPATH/test_dc_30.log");
 
         // Generate a message to reset the powertracker stats after SIM_SETTLING_TIME
         GENERATE_MSG(SIM_SETTLING_TIME, "Simulation Settling Time");
