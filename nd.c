@@ -9,7 +9,6 @@
 /*---------------------------------------------------------------------------*/
 #include <stdbool.h>
 #include <stdio.h>
-#include <assert.h>
 /*---------------------------------------------------------------------------*/
 #include "nd.h"
 #include "lpwf_packet.h"
@@ -17,12 +16,11 @@
 /*---------------------------------------------------------------------------*/
 #ifndef DEBUG
 #define DEBUG 1
+#define VERBOSE 0
 #endif
-#if DEBUG
-#define PRINTF(...) printf(__VA_ARGS__)
-#else
-#define PRINTF(...)
-#endif
+
+//#define dbg_pc(x) printf(#x ": %d\n", x);
+#define dbg_pc(x) 
 
 #define T_WINDOW_L (30 * (RTIMER_SECOND / 100))
 #define T_SPACING (1 * (RTIMER_SECOND / 100))
@@ -44,23 +42,36 @@ typedef struct {
   int epoch;
 } env_t;
 
-void dbg_print_env_t(const env_t *e){
-  PRINTF("{beacon_count : %d,mode : %d,phase : %d,"
-         "phase_count : %d,discovered : %d,epoch : %d}\n",
-         e->beacon_count, e->mode, e->phase, e->phase_count,
-         e->discovered, e->epoch);
-}
+#if DEBUG
+  #define PRINTF(...) printf(__VA_ARGS__)
+  #if VERBOSE
+  void dbg_print_env_t(const env_t *e){
+    PRINTF("{beacon_count : %d,mode : %d,phase : %d,"
+          "phase_count : %d,discovered : %d,epoch : %d}\n",
+          e->beacon_count, e->mode, e->phase, e->phase_count,
+          e->discovered, e->epoch);
+  }
+  #else
+  void dbg_print_env_t(const env_t *e){}
+  #endif
+  #define assert(x) if(!(x)){printf("[%s:%d]: " #x "\n", __FILE__, __LINE__);}
+    // ^ might crash the board if called in preemptive context
+#else
+  #define PRINTF(...)
+  #include <assert.h> //not supported on all boards, still
+  void dbg_print_env_t(const env_t *e){}
+#endif
 
 static env_t e;
 
 bool ins_disc(int id){
   int i;
+  assert(e.discovered < MAX_NBR);
   for(i = 0; i < e.discovered; i++){
     if(e.discovered_ids[i] == id){
       return false;
     }
   }
-  assert(e.discovered < MAX_NBR);
   e.discovered_ids[e.discovered] = id;
   e.discovered++;
   return true;
@@ -76,7 +87,7 @@ void nd_recv(void) {
       e.app_cb.nd_new_nbr(e.epoch, id);
     }
   }else{
-    printf("received corrupted packet\n");
+    PRINTF("received corrupted packet\n");
   }
 }
 
@@ -165,9 +176,9 @@ static void epoch_end(void){
 }
 
 static void poke(struct rtimer *t, void *unused){
-  printf("NEXT POKE\n");
+  PRINTF("NEXT POKE\n");
   if(process_post(&nd_process, 200, 0)){
-    printf("PROCESS_ERR_FULL\n");
+    PRINTF("PROCESS_ERR_FULL\n"); 
   }
 }
 
@@ -189,13 +200,13 @@ PROCESS_THREAD(nd_process, ev, data)
     assert(e.phase < 3);
     rtimer_clock_t backoff = phases[e.phase]();
     if(backoff > 0){
-      printf("NEXT : %u\n", RTIMER_NOW() + backoff);
+      PRINTF("NEXT : %u\n", RTIMER_NOW() + backoff);
       assert(
         !rtimer_set(&backoff_timer, RTIMER_NOW() + backoff, 0, poke, 0)
       );
       PROCESS_WAIT_EVENT();
-      while(ev != 200){ printf("not 200\n"); PROCESS_WAIT_EVENT(); }
-      printf("EVENT WAITED\n");
+      while(ev != 200){ PRINTF("not 200\n"); PROCESS_WAIT_EVENT(); }
+      PRINTF("EVENT WAITED\n");
     }
   }
   PROCESS_END();
@@ -205,10 +216,15 @@ void nd_start(uint8_t mode, const struct nd_callbacks *cb) {
   e.app_cb.nd_new_nbr = cb->nd_new_nbr;
   e.app_cb.nd_epoch_end = cb->nd_epoch_end;
   /* wont support threads */
+  dbg_pc(EPOCH_DURATION_N);
+  dbg_pc(R_WINDOW_L);
+  dbg_pc(R_WINDOW_D);
+  dbg_pc(T_WINDOW_L);
+  dbg_pc(T_SPACING);
   assert(EPOCH_DURATION_N > 0 && R_WINDOW_L > 0 && R_WINDOW_D > 0
       && T_WINDOW_L > 0 && T_SPACING > 0);
   assert(mode == ND_BURST || mode == ND_SCATTER);
   process_start(&nd_process, &mode);
-  printf("start done\n");
+  PRINTF("start done\n");
 }
 /*---------------------------------------------------------------------------*/
