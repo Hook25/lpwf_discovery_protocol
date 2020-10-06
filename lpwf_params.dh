@@ -4,6 +4,7 @@
 #define LPWF_T_W_MS {lpwf_t_w_ms}
 #define LPWF_T_S_MS {lpwf_t_s_ms}
 #define LPWF_R_W_PROP {lpwf_r_w_prop}
+#define R_RADIO_ON {lpwf_r_radio_on}
 
 /* An epoch is composed of 1 phase1 + N-1 phase2
     for example for ND_BURST and N = 4

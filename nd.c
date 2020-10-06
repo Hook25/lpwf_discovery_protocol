@@ -22,11 +22,11 @@
 
 #include "lpwf_params.h"
 
-#define T_WINDOW_L (LPWF_T_W_MS * (RTIMER_SECOND / 1000))
-#define T_SPACING (LPWF_T_S_MS * (RTIMER_SECOND / 1000))
+#define T_WINDOW_L (LPWF_T_W_MS * (RTIMER_ARCH_SECOND / 1000))
+#define T_SPACING (LPWF_T_S_MS * (RTIMER_ARCH_SECOND / 1000))
 #define T_BEACON_COUNT (T_WINDOW_L / T_SPACING)
 #define R_WINDOW_L (LPWF_R_W_PROP*T_WINDOW_L)
-#define R_WINDOW_D (R_WINDOW_L / 5)
+#define R_WINDOW_D (R_WINDOW_L / R_RADIO_ON)
 
 PROCESS(nd_process, "ND algorithm process");
 
@@ -85,9 +85,12 @@ bool ins_disc(int id){
 
 void act_recv(void) {
   int len = packetbuf_datalen();
+  if(len < sizeof(lpwf_packet)){
+    return;
+  }
   void *data = packetbuf_dataptr();
   lpwf_id id;
-  if(lpwf_get_id(data, len, &id)){
+  if(lpwf_get_id(data, sizeof(lpwf_packet), &id)){
     assert(e.app_cb.nd_new_nbr);
     if(ins_disc(id)){
       e.app_cb.nd_new_nbr(e.epoch, id);
@@ -98,9 +101,7 @@ void act_recv(void) {
 }
 
 void nd_recv(void){
-  if(process_post(&nd_process, RECV_PENDING_ID, 0)){
-    PRINTF("PROCESS_ERR_FULL\n"); 
-  }
+  assert(process_post(&nd_process, RECV_PENDING_ID, 0) == PROCESS_ERR_OK);
 }
 
 static void beacon(void){
@@ -108,7 +109,7 @@ static void beacon(void){
   memset(&to_send, 0, sizeof to_send);
   lpwf_build_from_id(&to_send, &node_id);
   packetbuf_clear();
-  packetbuf_set_datalen(sizeof(lpwf_packet));
+  packetbuf_set_datalen(sizeof(to_send));
   memcpy(packetbuf_dataptr(), &to_send, sizeof to_send);
   NETSTACK_RADIO.send(packetbuf_dataptr(), packetbuf_datalen());
 }
@@ -195,10 +196,12 @@ static void poke(struct rtimer *t, void *unused){
 }
 
 /*---------------------------------------------------------------------------*/
+
 PROCESS_THREAD(nd_process, ev, data)
 {
   static struct rtimer backoff_timer;
   static int (*phases[3])(void);
+  static rtimer_clock_t eow;
   PROCESS_BEGIN();
   e.mode = *((uint8_t *)data);
   init_p_arr(e.mode, phases);
@@ -212,18 +215,24 @@ PROCESS_THREAD(nd_process, ev, data)
     assert(e.phase < 3);
     rtimer_clock_t backoff = phases[e.phase]();
     if(backoff > 0){
-      PRINTF("NEXT : %u\n", RTIMER_NOW() + backoff);
+      eow = RTIMER_NOW() + backoff;
       assert(
-        !rtimer_set(&backoff_timer, RTIMER_NOW() + backoff, 0, poke, 0)
+        rtimer_set(&backoff_timer, eow, 0, poke, 0) == RTIMER_OK
       );
-      PROCESS_WAIT_EVENT();
-      while(ev != POKE_ID){ //recv_pending or other
+      PROCESS_YIELD();
+      while(ev != POKE_ID && eow < RTIMER_NOW()){ //recv_pending or other
+        if(RTIMER_NOW() > RTIMER_TIME(&backoff_timer)){
+          printf("%u > %u\n", RTIMER_NOW(), RTIMER_TIME(&backoff_timer));
+        }
         if(ev == RECV_PENDING_ID){
           act_recv();
+        }else{
+          printf("EV: %d\n", ev);
         }
-        PROCESS_WAIT_EVENT(); 
+        PROCESS_YIELD(); 
       }
-      PRINTF("EVENT WAITED\n");
+    }else{
+      printf("SKIPPED TIMER\n");
     }
   }
   PROCESS_END();
@@ -242,6 +251,6 @@ void nd_start(uint8_t mode, const struct nd_callbacks *cb) {
       && T_WINDOW_L > 0 && T_SPACING > 0);
   assert(mode == ND_BURST || mode == ND_SCATTER);
   process_start(&nd_process, &mode);
-  PRINTF("start done\n");
+  assert(0);
 }
 /*---------------------------------------------------------------------------*/

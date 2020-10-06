@@ -204,8 +204,8 @@
         ptplugin = sim.getCooja().getStartedPlugin("PowerTracker");
         ptplugin.reset();
 
-        outputs = new FileWriter("OUTPATH/test_5.log");
-        dcoutputs = new FileWriter("OUTPATH/test_dc_5.log");
+        outputs = new FileWriter(OUTPATH_LOG);
+        dcoutputs = new FileWriter(OUTPATH_LOG_DC);
 
         // Generate a message to reset the powertracker stats after SIM_SETTLING_TIME
         GENERATE_MSG(SIM_SETTLING_TIME, "Simulation Settling Time");
